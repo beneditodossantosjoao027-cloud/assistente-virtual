@@ -59,3 +59,6 @@ Este projeto executa ações reais no computador (mouse, teclado, arquivos, shel
 - O servidor Flask do celular escuta em `0.0.0.0` na porta 5000. Use somente em rede confiável e, de preferência, proteja com token.
 - Comandos de voz podem apagar e mover arquivos e executar código gerado por IA.
 - Nunca commite chaves de API, PIN do celular, número de telefone, `memoria_local.json`, `auditoria_indianos.log` ou o perfil do Edge usado no WhatsApp.
+## update
+agora a ia pode ler arquivos, revisar códigos, criar copias de seguranca dos arquivos e mais algumas coisas.
+para ter essas novas funcoes e necesario baixar o novo arquivo atualizado da indianos e baixar o codigo separado chamado indianos arquvos e deixar ambos na mesma pasta.
