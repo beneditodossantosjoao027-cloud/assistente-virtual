@@ -1,15 +1,15 @@
 import asyncio
 import audioop
-import hmac
-import secrets
 import base64
 import ctypes
 import io
 import json
 import os
 import tempfile
+import hmac
 import random
 import re
+import secrets
 import shutil
 import socket
 import subprocess
@@ -48,7 +48,6 @@ VELOCIDADE_CURSOR = 20
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-
 try:
     from ctypes import cast, POINTER
     from comtypes import CLSCTX_ALL
@@ -72,6 +71,11 @@ except Exception:
     FLASK_DISPONIVEL = False
     print("[Rede] Flask não instalado (servidor pro celular fica desligado). Rode: pip install flask --break-system-packages")
 
+try:
+    import indianos_arquivos as arquivos_ia
+except Exception as _e_arq:
+    arquivos_ia = None
+    print(f"[Arquivos IA] indianos_arquivos.py não carregou ({_e_arq}). Deixe ele na mesma pasta da Indianos.")
 
 try:
     from pywinauto.application import Application
@@ -89,7 +93,6 @@ except Exception as e:
     print(f"[Visão] pytesseract/Pillow não carregou (erro real: {e}). Rode: pip install pytesseract pillow --break-system-packages "
           "(e instale o programa Tesseract-OCR: https://github.com/UB-Mannheim/tesseract/wiki)")
 
-
 CHAVES_API = [
     v for v in (os.environ.get(f"GEMINI_KEY_{i}") for i in range(1, 11))
     if v
@@ -101,15 +104,13 @@ if not CHAVES_API:
 MODELOS = [
     "gemini-3.1-flash-lite",
     "gemini-3.1-pro-preview"
-
 ]
 
 
 COMBOS = [(chave, modelo) for chave in CHAVES_API for modelo in MODELOS]
 
 def montar_url(chave, modelo):
-    return f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={chave}"
 
 OLLAMA_ATIVO = True
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -155,7 +156,6 @@ def chamar_ollama_local(prompt_texto, timeout=30):
 
 IDIOMA = "pt-BR"
 
-
 QTD_MENSAGENS_LEMBRADAS = 20
 ARQUIVO_MEMORIA_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memoria_local.json")
 
@@ -163,6 +163,7 @@ REGIAO_IRIUN = {"top": 0, "left": 640, "width": 640, "height": 500}
 import ctypes
 _user32 = ctypes.windll.user32
 REGIAO_TELA_CHEIA = {"top": 0, "left": 0, "width": _user32.GetSystemMetrics(0), "height": _user32.GetSystemMetrics(1)}
+ARQUIVO_IMAGEM_22 = "bolsonaro.png"
 ARQUIVO_NOTAS = "notas_indianos.txt"
 
 import winreg
@@ -193,7 +194,6 @@ _pastas_candidatas = [
     os.path.join(os.path.expanduser("~"), "Downloads"),
     os.path.join(os.path.expanduser("~"), "Documents"),
 ]
-
 _vistas = set()
 PASTAS_BUSCA_ARQUIVOS = []
 for _p in _pastas_candidatas:
@@ -210,7 +210,6 @@ THRESHOLD_PALMA = 5.0
 
 COM_PORTA_ARDUINO = "COM5"
 
-
 sistema_ativo = False
 escutando_palmas = False
 mic_pausado = False
@@ -222,15 +221,13 @@ lock_api = threading.Lock()
 indice_combo_atual = 0
 driver_zap = None
 
-
 try:
     arduino = serial.Serial(COM_PORTA_ARDUINO, 9600, timeout=1)
     time.sleep(2)
-    print(f"Arduino conectado na {COM_PORTA_ARDUINO}")
+    print(f"✅ Arduino conectado na {COM_PORTA_ARDUINO}")
 except Exception as e:
-    print(f"Erro ao conectar no Arduino: {e}")
+    print(f"❌ Erro ao conectar no Arduino: {e}")
     arduino = None
-
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -250,16 +247,11 @@ print(f"[DPI] Fator de escala detectado: {FATOR_DPI}x (raw={FATOR_DPI * 100:.0f}
 mouse = MouseController()
 teclado = KeyboardController()
 
-
 wn = turtle.Screen()
 wn.title("INDIANOS REMASTER - Core Visão Web")
-
-
 wn.setup(width=220, height=220, startx=0, starty=0)
 wn.bgcolor("#101010")
 wn.tracer(0)
-
-
 wn._root.attributes('-topmost', True)
 wn._root.resizable(False, False)
 
@@ -292,7 +284,6 @@ def restaurar_janela():
     except Exception as e:
         print(f"[Janela] Erro ao restaurar: {e}")
 
-
 def chamar_gemini(payload, timeout=40, max_tentativas=None, permitir_fallback_local=True):
     global indice_combo_atual
     tentativas = max_tentativas or (len(COMBOS) * 2)
@@ -304,7 +295,7 @@ def chamar_gemini(payload, timeout=40, max_tentativas=None, permitir_fallback_lo
 
         try:
             resposta = requests.post(
-                url, headers={'Content-Type': 'application/json', 'x-goog-api-key': chave_atual},
+                url, headers={'Content-Type': 'application/json'},
                 data=json.dumps(payload), timeout=timeout
             )
         except requests.exceptions.RequestException as e:
@@ -319,8 +310,6 @@ def chamar_gemini(payload, timeout=40, max_tentativas=None, permitir_fallback_lo
             continue
 
         if resposta.status_code in (500, 502, 503, 504):
-
-
             print(f"[API] '{modelo_atual}' indisponível agora (HTTP {resposta.status_code}). "
                   f"Tentando de novo em 2s...")
             time.sleep(2)
@@ -341,7 +330,6 @@ def chamar_gemini(payload, timeout=40, max_tentativas=None, permitir_fallback_lo
 
     print("[COTA] Todos os combos chave+modelo esgotaram por agora.")
 
-
     if not _payload_tem_imagem(payload) and permitir_fallback_local:
         prompt_local = _extrair_ultimo_texto(payload)
         if prompt_local:
@@ -356,7 +344,7 @@ def chamar_gemini(payload, timeout=40, max_tentativas=None, permitir_fallback_lo
 
 def _executar_fluxo_controle(x_destino, y_destino, texto_para_digitar=None):
     try:
-        print(f"ALVO: ({x_destino}, {y_destino})")
+        print(f"🎯 ALVO: ({x_destino}, {y_destino})")
         mouse.position = (x_destino, y_destino)
         time.sleep(0.5)
         mouse.click(Button.right, 1)
@@ -378,7 +366,7 @@ def abrir_caixa_texto_main_thread():
     global mic_pausado
     try:
         atualizar_corpo("processando")
-        mostrar_texto("DIGITANDO MENSAGEM...")
+        mostrar_texto("⌨️ DIGITANDO MENSAGEM...")
         texto = wn.textinput("Entrada de Texto", "Digite sua mensagem para a IA:")
         if texto and texto.strip():
             threading.Thread(target=processar_resposta_texto, args=(texto,), daemon=True).start()
@@ -422,15 +410,11 @@ def falar(texto):
         mic_pausado = True
         robo_falando = True
         estado_atual_rosto = "falando"
-
-
         pasta_audio = os.path.join(tempfile.gettempdir(), "indianos_remaster_audio")
         os.makedirs(pasta_audio, exist_ok=True)
         nome_arquivo = os.path.join(pasta_audio, f"audio_{int(time.time() * 1000)}.mp3")
 
         async def _gerar():
-
-
             communicate = edge_tts.Communicate(
                 texto, voice="pt-BR-AntonioNeural", rate="-5%", pitch="-30Hz"
             )
@@ -464,20 +448,20 @@ def mic_loop_continuo():
         return
     with mic_device as source:
         recognizer.adjust_for_ambient_noise(source, duration=1)
-        print("\n[SISTEMA] Escuta ativa pronta.")
+        print("\n🎤 [SISTEMA] Escuta ativa pronta.")
         while sistema_ativo:
             if mic_pausado or robo_falando:
                 time.sleep(0.2)
                 continue
             estado_atual_rosto = "ouvindo"
-            mostrar_texto("OUVINDO... FALE SUA ORDEM")
+            mostrar_texto("🎤 OUVINDO... FALE SUA ORDEM")
             try:
                 audio_data = recognizer.listen(source, timeout=1, phrase_time_limit=50)
                 if mic_pausado or robo_falando or not sistema_ativo:
                     continue
                 estado_atual_rosto = "processando"
                 atualizar_corpo("processando")
-                mostrar_texto("PROCESSANDO SUA FALA...")
+                mostrar_texto("⚙️ PROCESSANDO SUA FALA...")
                 texto = recognizer.recognize_google(audio_data, language=IDIOMA)
                 if len(texto) < 2:
                     continue
@@ -586,6 +570,14 @@ def loop_animacao_rosto():
             break
 
 
+def disparar_evento_22():
+    mostrar_texto("🇧🇷 PROTOCOLO 22 ATIVADO! 🇧🇷")
+    if os.path.exists(ARQUIVO_IMAGEM_22):
+        try:
+            os.startfile(ARQUIVO_IMAGEM_22)
+        except Exception:
+            pass
+
 def _normalizar_texto_busca(texto):
     import unicodedata
     texto = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
@@ -654,7 +646,7 @@ def ler_texto_tela_ocr(regiao=None):
 def executar_analise_foto_unica():
     try:
         print("[VISÃO] Capturando imagem para análise didática/gestos...")
-        mostrar_texto("CAPTURANDO FOTO...")
+        mostrar_texto("📸 CAPTURANDO FOTO...")
         atualizar_corpo("processando")
         with mss.mss() as sct:
             sct_img = sct.grab(REGIAO_IRIUN)
@@ -665,10 +657,11 @@ def executar_analise_foto_unica():
             "A imagem pode conter uma questão de livro didático com texto, gráficos, figuras geométricas ou fórmulas.\n\n"
             "REGRAS DE PRIORIDADE:\n"
             "1. Se houver um gesto de 'dedo do meio', retorne APENAS: DEDO_MEIO\n"
-            "2. Se houver uma questão escolar ou conta matemática: repita a parte mais importante do enunciado, "
+            "2. Se houver um gesto de número 2 com os dedos, retorne APENAS: SINAL_22\n"
+            "3. Se houver uma questão escolar ou conta matemática: repita a parte mais importante do enunciado, "
             "diga que entendeu e dê o resultado final resumido.\n"
-            "3. Se a imagem contiver texto em outro idioma, traduza para o português.\n"
-            "4. Se não houver nada visível, retorne APENAS: NADA."
+            "4. Se a imagem contiver texto em outro idioma, traduza para o português.\n"
+            "5. Se não houver nada visível, retorne APENAS: NADA."
         )
         texto_resposta = chamar_gemini({"contents": [{"parts": [
             {"text": pergunta},
@@ -676,13 +669,16 @@ def executar_analise_foto_unica():
         ]}]}, timeout=40)
 
         if not texto_resposta:
-            mostrar_texto("API SEM RESPOSTA - TENTE NOVAMENTE")
+            mostrar_texto("⏳ API SEM RESPOSTA - TENTE NOVAMENTE")
             return
 
         resultado = texto_resposta.strip()
-        print(f"[SCANNER VISUAL]: {resultado}")
+        print(f"🔍 [SCANNER VISUAL]: {resultado}")
         resultado_upper = resultado.upper()
-        if "DEDO_MEIO" in resultado_upper:
+        if "SINAL_22" in resultado_upper:
+            disparar_evento_22()
+            falar("Sinal 22 identificado. Mostrando foto de Jair Messias Bolsonaro!")
+        elif "DEDO_MEIO" in resultado_upper:
             mostrar_texto("Gesto ofensivo detectado!")
             falar("Ei, tira esse dedo da tela, moleque sem noção.")
         elif "NADA" in resultado_upper and len(resultado) < 10:
@@ -696,7 +692,7 @@ def executar_analise_foto_unica():
 
 def gerar_imagem_ia(descricao_usuario):
     try:
-        mostrar_texto("GERANDO IMAGEM...")
+        mostrar_texto("🎨 GERANDO IMAGEM...")
         atualizar_corpo("processando")
         nome_arquivo = f"img_{uuid.uuid4().hex[:8]}.png"
         prompt_encoded = urllib.parse.quote(descricao_usuario)
@@ -706,17 +702,17 @@ def gerar_imagem_ia(descricao_usuario):
             if resposta_img.status_code == 200:
                 with open(nome_arquivo, 'wb') as f:
                     f.write(resposta_img.content)
-                mostrar_texto(f"IMAGEM SALVA: {nome_arquivo}")
+                mostrar_texto(f"✅ IMAGEM SALVA: {nome_arquivo}")
                 falar("Imagem gerada e salva com sucesso.")
                 os.startfile(nome_arquivo)
                 return
             elif resposta_img.status_code == 402:
-                mostrar_texto(f"LIMITE DE REQUISIÇÕES, AGUARDANDO... ({tentativa + 1}/3)")
+                mostrar_texto(f"⏳ LIMITE DE REQUISIÇÕES, AGUARDANDO... ({tentativa + 1}/3)")
                 time.sleep(30)
             else:
                 falar("Não consegui gerar a imagem. Tente novamente.")
                 return
-        mostrar_texto("FALHOU APÓS 3 TENTATIVAS")
+        mostrar_texto("❌ FALHOU APÓS 3 TENTATIVAS")
         falar("Não consegui gerar a imagem após várias tentativas.")
     except Exception as e:
         print(f"[Imagem] Erro: {e}")
@@ -725,8 +721,6 @@ def gerar_imagem_ia(descricao_usuario):
 def tirar_print(comando_usuario=""):
     ocultar_janela_temporariamente()
     try:
-
-
         if not _comando_pede_digitacao(comando_usuario):
             alvo_ui = localizar_elemento_ui_por_texto(comando_usuario)
             if alvo_ui:
@@ -759,7 +753,7 @@ def tirar_print(comando_usuario=""):
         ]}]}, timeout=40)
 
         if not texto_resposta:
-            mostrar_texto("API SEM RESPOSTA - TENTE NOVAMENTE")
+            mostrar_texto("⏳ API SEM RESPOSTA - TENTE NOVAMENTE")
             return
 
         resultado = texto_resposta.strip()
@@ -877,7 +871,7 @@ def _refinar_coordenada_com_zoom(descricao, x_aprox, y_aprox, largura_tela, altu
 
         x_refinado = esquerda + int(resultado["x"] / 1000 * largura_crop)
         y_refinado = topo + int(resultado["y"] / 1000 * altura_crop)
-        print(f"[Refinamento] '{descricao}' ({x_aprox},{y_aprox}) -> ({x_refinado},{y_refinado})")
+        print(f"🔎 [Refinamento] '{descricao}' ({x_aprox},{y_aprox}) -> ({x_refinado},{y_refinado})")
         return x_refinado, y_refinado
     except Exception as e:
         print(f"[Refinamento] Erro (usando coordenada aproximada): {e}")
@@ -935,16 +929,13 @@ def jogar_xadrez(comando_usuario):
         if "JOGADA[" in resultado:
             jogada_desc = resultado.split("JOGADA[")[1].split("]")[0]
 
-
         px, py = _refinar_coordenada_com_zoom("a peça a ser movida", px, py, largura, altura)
         dx, dy = _refinar_coordenada_com_zoom("a casa de destino da jogada", dx, dy, largura, altura)
-
 
         mouse.position = (px, py)
         time.sleep(0.3)
         mouse.click(Button.right, 1)
         time.sleep(0.4)
-
 
         mouse.position = (dx, dy)
         time.sleep(0.2)
@@ -958,12 +949,43 @@ def jogar_xadrez(comando_usuario):
     finally:
         restaurar_janela()
 
-
-PASTA_CODIGOS = os.path.join(os.path.expanduser("~"), "Desktop", "codigos_indianos")
-os.makedirs(PASTA_CODIGOS, exist_ok=True)
-
+PASTA_CODIGOS = os.path.join(
+    _obter_pasta_real("Desktop", os.path.join(os.path.expanduser("~"), "Desktop")),
+    "codigos_indianos"
+)
 
 CAMINHO_NOTEPADPP = r"C:\Program Files\Notepad++\notepad++.exe"
+
+_PASTA_DESKTOP_REAL = _obter_pasta_real("Desktop", os.path.join(os.path.expanduser("~"), "Desktop"))
+PASTA_RECEBIDOS = os.path.join(_PASTA_DESKTOP_REAL, "indianos_recebidos")
+
+def _abrir_no_editor_arquivos(caminho):
+    try:
+        if os.path.exists(CAMINHO_NOTEPADPP):
+            subprocess.Popen([CAMINHO_NOTEPADPP, caminho])
+        else:
+            os.startfile(caminho)
+    except Exception as e:
+        print(f"[Arquivos IA] Não consegui abrir {caminho}: {e}")
+
+if arquivos_ia:
+    arquivos_ia.configurar(
+        gemini=lambda *a, **k: chamar_gemini(*a, **k),
+        falar=lambda t: falar(t),
+        mostrar=lambda t: mostrar_texto(t),
+        localizar=lambda n: localizar_arquivo(n),
+        auditoria=lambda a, d="": registrar_auditoria(a, d),
+        pasta_codigos=PASTA_CODIGOS,
+        pasta_recebidos=PASTA_RECEBIDOS,
+        pastas={
+            "area de trabalho": _PASTA_DESKTOP_REAL,
+            "desktop": _PASTA_DESKTOP_REAL,
+            "downloads": _obter_pasta_real("{374DE290-123F-4565-9164-39C4925E467B}",
+                                           os.path.join(os.path.expanduser("~"), "Downloads")),
+            "documentos": _obter_pasta_real("Personal", os.path.join(os.path.expanduser("~"), "Documents")),
+        },
+        editor=_abrir_no_editor_arquivos,
+    )
 
 def gerar_e_rodar_codigo(comando_usuario):
     editor_pedido = "notepad++" if "notepad" in comando_usuario.lower() else "idle"
@@ -993,7 +1015,6 @@ def gerar_e_rodar_codigo(comando_usuario):
         falar("Gerei o código mas não consegui salvar o arquivo.")
         return
 
-
     try:
         if editor_pedido == "notepad++" and os.path.exists(CAMINHO_NOTEPADPP):
             subprocess.Popen([CAMINHO_NOTEPADPP, caminho])
@@ -1002,9 +1023,6 @@ def gerar_e_rodar_codigo(comando_usuario):
     except Exception as e:
         print(f"[Programar] Não consegui abrir o editor (código já foi salvo em {caminho}): {e}")
 
-    if os.environ.get("INDIANOS_RODAR_CODIGO") != "1":
-        falar("Escrevi o código e abri no editor. A execução automática está desligada por segurança.")
-        return
     falar("Escrevi o código, vou rodar agora pra ver se tem erro.")
     try:
         resultado = subprocess.run(
@@ -1013,11 +1031,11 @@ def gerar_e_rodar_codigo(comando_usuario):
         )
         if resultado.returncode == 0:
             saida = resultado.stdout.strip() or "(sem nada impresso na tela)"
-            mostrar_texto(f"Rodou sem erro. Saída: {saida[:300]}")
+            mostrar_texto(f"✅ Rodou sem erro. Saída: {saida[:300]}")
             falar(f"Rodou sem erro. {('Saída: ' + saida[:200]) if resultado.stdout.strip() else 'Não imprimiu nada na tela.'}")
         else:
             erro = resultado.stderr.strip()
-            mostrar_texto(f"Erro: {erro[-300:]}")
+            mostrar_texto(f"❌ Erro: {erro[-300:]}")
             falar(f"Deu erro rodando. {erro.splitlines()[-1] if erro else ''}")
             print(f"[Programar] Erro completo:\n{erro}")
     except subprocess.TimeoutExpired:
@@ -1033,11 +1051,9 @@ def _iniciar_driver_zap():
         if driver_zap is not None:
             return True
         print("[ZAP] Abrindo Edge com perfil dedicado...")
-        mostrar_texto("ABRINDO WHATSAPP WEB...")
+        mostrar_texto("📱 ABRINDO WHATSAPP WEB...")
         falar("Abrindo WhatsApp Web.")
         options = Options()
-
-
         options.add_argument(r"--user-data-dir=C:\Users\%USERNAME%\IndianosEdgeProfile".replace(
             "%USERNAME%", os.environ.get("USERNAME", "Usuario")))
         options.add_argument("--profile-directory=Default")
@@ -1049,7 +1065,7 @@ def _iniciar_driver_zap():
             EC.presence_of_element_located((By.CSS_SELECTOR, 'div[contenteditable="true"][data-tab="3"]'))
         )
         print("[ZAP] WhatsApp Web conectado!")
-        mostrar_texto("WHATSAPP CONECTADO!")
+        mostrar_texto("✅ WHATSAPP CONECTADO!")
         falar("WhatsApp conectado!")
         return True
     except Exception as e:
@@ -1094,7 +1110,7 @@ def _resolver_mensagem_zap(texto_usuario, nome_contato, mensagem_bruta):
 
 def enviar_whatsapp(texto_usuario):
     try:
-        mostrar_texto("PROCESSANDO MENSAGEM ZAP...")
+        mostrar_texto("📱 PROCESSANDO MENSAGEM ZAP...")
         atualizar_corpo("processando")
         nome_contato, mensagem_bruta = _extrair_info_zap(texto_usuario)
         if not nome_contato or not mensagem_bruta:
@@ -1114,7 +1130,7 @@ def enviar_whatsapp(texto_usuario):
         if not _iniciar_driver_zap():
             return
         falar(f"Mandando mensagem pro {nome_contato} no WhatsApp.")
-        mostrar_texto(f"MANDANDO ZAP PRO {nome_contato.upper()}...")
+        mostrar_texto(f"📤 MANDANDO ZAP PRO {nome_contato.upper()}...")
         search_box = WebDriverWait(driver_zap, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, 'div[contenteditable="true"][data-tab="3"]'))
         )
@@ -1137,14 +1153,14 @@ def enviar_whatsapp(texto_usuario):
         time.sleep(0.5)
         caixa_msg.send_keys(Keys.ENTER)
         time.sleep(1)
-        print(f"[ZAP] Mensagem enviada pro {nome_contato}!")
-        mostrar_texto(f"ZAP ENVIADO PRO {nome_contato.upper()}!")
+        print(f"[ZAP] ✅ Mensagem enviada pro {nome_contato}!")
+        mostrar_texto(f"✅ ZAP ENVIADO PRO {nome_contato.upper()}!")
         falar(f"Mensagem enviada pro {nome_contato} com sucesso!")
         registrar_auditoria("WHATSAPP ENVIADO", f"Para: {nome_contato} | Msg: {mensagem_final}")
     except Exception as e:
         print(f"[ZAP] Erro: {e}")
         falar("Erro ao enviar mensagem.")
-        mostrar_texto("ERRO AO ENVIAR ZAP")
+        mostrar_texto("❌ ERRO AO ENVIAR ZAP")
 
 
 def escrever_no_bloco(conteudo):
@@ -1194,10 +1210,10 @@ def controlar_leds(texto_min):
         return
     if any(p in texto_min for p in ["acender", "liga", "ligar"]):
         arduino.write(b"APAGAR\n")
-        print("Comando ACENDER enviado")
+        print("✅ Comando ACENDER enviado")
     elif any(p in texto_min for p in ["apagar", "desligar", "apaga"]):
         arduino.write(b"ACENDER\n")
-        print("Comando APAGAR enviado")
+        print("✅ Comando APAGAR enviado")
 
 def fechar_sistema_e_voltar_espera():
     global sistema_ativo, mic_pausado
@@ -1247,7 +1263,7 @@ def processar_resposta_texto(texto):
     if mensagem_apoio:
         estado_atual_rosto = "espera"
         atualizar_corpo("espera")
-        mostrar_texto("CANAL DE APOIO")
+        mostrar_texto("⚠️ CANAL DE APOIO")
         falar(mensagem_apoio)
         mic_pausado = False
         return
@@ -1255,14 +1271,12 @@ def processar_resposta_texto(texto):
     texto_min = texto.lower()
     controlar_leds(texto_min)
 
-
     if any(g in texto_min for g in ["manda zap", "manda whatsapp", "envia zap",
                                      "manda mensagem no zap", "manda no whatsapp",
                                      "zap pro", "whatsapp pro"]):
         threading.Thread(target=enviar_whatsapp, args=(texto,), daemon=True).start()
         mic_pausado = False
         return
-
 
     elif "celular" in texto_min or re.search(r"\bcel\b", texto_min):
         if any(p in texto_min for p in ["liga a tela", "acorda", "ativa a tela"]):
@@ -1342,20 +1356,17 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(g in texto_min for g in ["clica", "clique", "digite", "digita", "print"]):
         falar("Deixa comigo, vou analisar a tela para agir.")
         tirar_print(texto)
         mic_pausado = False
         return
 
-
     elif any(g in texto_min for g in ["arrasta", "arraste"]):
         falar("Deixa comigo, vou arrastar isso.")
         threading.Thread(target=arrastar_para, args=(texto,), daemon=True).start()
         mic_pausado = False
         return
-
 
     elif any(g in texto_min for g in ["mova a peca", "mova a peça", "move a peca", "move a peça",
                                        "faz uma jogada", "faça uma jogada", "joga de xadrez",
@@ -1364,6 +1375,9 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
+    elif arquivos_ia and arquivos_ia.tratar_comando(texto, texto_min):
+        mic_pausado = False
+        return
 
     elif any(g in texto_min for g in ["programa", "programe", "codifica", "codifique",
                                        "escreve um codigo", "escreve um código",
@@ -1373,13 +1387,11 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(g in texto_min for g in ["camera", "rosto", "verificar"]):
         falar("Deixa comigo, vou analisar a câmera para agir.")
         executar_analise_foto_unica()
         mic_pausado = False
         return
-
 
     elif "volume" in texto_min:
         numeros = re.findall(r"\d+", texto_min)
@@ -1393,7 +1405,6 @@ def processar_resposta_texto(texto):
             falar("Não entendi para quantos por cento ajustar o volume.")
         mic_pausado = False
         return
-
 
     elif any(p in texto_min for p in ["maximiza", "maximizar"]):
         keyboard.send('windows+up')
@@ -1414,7 +1425,6 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(p in texto_min for p in ["desligar o pc", "desligar o computador", "desliga o pc", "desliga o computador"]):
         falar("Desligando o computador em dez segundos. Diga cancelar desligamento para impedir.")
         subprocess.run("shutdown /s /t 10", shell=True)
@@ -1433,7 +1443,6 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(p in texto_min for p in ["dispositivos conectados", "dispositivos usb",
                                        "o que ta conectado", "o que esta conectado",
                                        "conectado no pc", "conectado no computador"]):
@@ -1445,7 +1454,6 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(p in texto_min for p in ["log de auditoria", "ultimas acoes", "últimas ações",
                                        "o que voce fez", "o que você fez"]):
         ultimas = ler_ultimas_auditorias(5)
@@ -1455,7 +1463,6 @@ def processar_resposta_texto(texto):
             falar("Nenhuma ação sensível registrada ainda.")
         mic_pausado = False
         return
-
 
     elif _eh_comando_apagar_arquivo(texto_min):
         nome = _extrair_nome_apos_ancora(texto_min)
@@ -1482,14 +1489,12 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(g in texto_min for g in ["anota", "anote", "escreva", "escreve", "salva no bloco", "escreve no bloco"]):
         estado_atual_rosto = "processando"
         atualizar_corpo("processando")
         processar_comando_escrever(texto, texto_min)
         mic_pausado = False
         return
-
 
     elif any(g in texto_min for g in ["gera", "cria", "crie", "criar", "desenha", "gerar imagem", "cria uma imagem"]):
         gerar_imagem_ia(texto_min)
@@ -1502,7 +1507,6 @@ def processar_resposta_texto(texto):
         falar("Bloco de notas limpo.")
         mic_pausado = False
         return
-
 
     elif "pesquisar" in texto_min or "buscar" in texto_min:
         termo_busca = texto_min
@@ -1518,33 +1522,27 @@ def processar_resposta_texto(texto):
         mic_pausado = False
         return
 
-
     elif any(p in texto_min for p in ["abrir arquivo", "abrir programa", "abrir"]):
         alvo = texto_min.replace("abrir arquivo", "").replace("abrir programa", "").replace("abrir", "").strip()
-        if alvo and re.search(r'[&|<>^%"`\n\r]', alvo):
-            falar("Esse nome tem caracteres que não posso usar para abrir.")
-        elif alvo:
+        if alvo:
             try:
                 falar(f"Tentando abrir {alvo}.")
-                subprocess.Popen(["cmd", "/c", "start", "", alvo])
+                subprocess.Popen(f"start {alvo}", shell=True)
             except Exception:
                 falar("Não consegui abrir esse arquivo específico.")
         mic_pausado = False
         return
-
 
     elif any(p in texto_min for p in ["desligar sistema", "dormir", "encerrar"]):
         falar("Entendido. Retornando ao modo de segurança.")
         fechar_sistema_e_voltar_espera()
         return
 
-
     elif any(p in texto_min for p in ["mova o mouse", "mova", "mouse", "mause"]):
         falar("movendo")
         cord = texto_min.replace("mova o mouse", "").replace("mova", "").replace("mouse", "").replace("mause", "")
         mexer(cord)
         return
-
 
     estado_atual_rosto = "processando"
     atualizar_corpo("processando")
@@ -1568,7 +1566,7 @@ def mexer(cord):
         if not texto_resposta:
             return
         linha = texto_resposta.strip().upper()
-        print(f"[SCANNER VISUAL]: Comando detectado -> {linha}")
+        print(f"🔍 [SCANNER VISUAL]: Comando detectado -> {linha}")
         if linha == 'C':
             mouse.move(0, -VELOCIDADE_CURSOR)
         elif linha == 'B':
@@ -1617,7 +1615,6 @@ def localizar_arquivo(nome_arquivo):
 
     print(f"[Arquivos] Não achou nas pastas comuns, expandindo busca pro perfil inteiro...")
     for raiz, dirs, arquivos in os.walk(PASTA_PERFIL_USUARIO):
-
         dirs[:] = [d for d in dirs if not d.startswith('.') and d not in
                    ('AppData', 'NTUSER.DAT', '$Recycle.Bin')]
         for arq in arquivos:
@@ -1822,7 +1819,7 @@ def alternar_modo_vivo():
     MODO_VIVO_ATIVO = not MODO_VIVO_ATIVO
     estado = "ATIVADO" if MODO_VIVO_ATIVO else "DESATIVADO"
     print(f"[Modo Vivo] {estado} via atalho (Ctrl+Shift+V).")
-    mostrar_texto(f"MODO VIVO {estado}")
+    mostrar_texto(f"👁️ MODO VIVO {estado}")
 
 def analisar_tela_proativamente():
     try:
@@ -1883,7 +1880,6 @@ def loop_modo_vivo():
         time.sleep(5)
         if not MODO_VIVO_ATIVO or not sistema_ativo:
             continue
-
         if estado_atual_rosto in ("processando", "falando", "ouvindo"):
             continue
         with _lock_atividade:
@@ -1920,6 +1916,7 @@ def ler_ultimas_auditorias(qtd=5):
 
 
 PORTA_SERVIDOR_REDE = 5000
+TOKEN_REDE = os.environ.get("INDIANOS_TOKEN") or secrets.token_urlsafe(9)
 
 _PAGINA_CELULAR = """<!doctype html>
 <html lang="pt-br">
@@ -1937,14 +1934,18 @@ _PAGINA_CELULAR = """<!doctype html>
 </style>
 </head>
 <body>
-  <h1>Indianos Remaster</h1>
+  <h1>🤖 Indianos Remaster</h1>
   <div id="status">Carregando status...</div>
   <input id="comando" placeholder="Digite um comando (ex: coloca o volume em 30%)">
   <button onclick="enviar()">Enviar</button>
+  <h3>Enviar arquivo pra Indianos</h3>
+  <input id="arq" type="file" multiple>
+  <button onclick="enviarArquivo()">Enviar arquivo</button>
+  <div id="envio" style="font-size:14px;color:#aaa;margin:6px 0"></div>
   <h3>Últimas ações (auditoria)</h3>
   <ul id="auditoria"></ul>
 <script>
-const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
 async function atualizarStatus() {
   try {
     const r = await fetch('/status', {headers: {'X-Token': TOKEN}});
@@ -1952,7 +1953,7 @@ async function atualizarStatus() {
     document.getElementById('status').innerText =
       'Sistema: ' + (d.sistema_ativo ? 'ATIVO' : 'bloqueado') + ' | Estado: ' + d.estado_rosto + ' | Modo Vivo: ' + (d.modo_vivo ? 'ligado' : 'desligado');
     document.getElementById('auditoria').innerHTML =
-      d.auditoria.map(l => '<li>' + String(l).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) + '</li>').join('');
+      d.auditoria.map(l => '<li>' + l + '</li>').join('');
   } catch(e) {}
 }
 async function enviar() {
@@ -1965,23 +1966,39 @@ async function enviar() {
   });
   campo.value = '';
 }
+async function enviarArquivo() {
+  const el = document.getElementById('arq');
+  if (!el.files.length) return;
+  const fd = new FormData();
+  for (const f of el.files) fd.append('arquivo', f);
+  const out = document.getElementById('envio');
+  out.innerText = 'Enviando...';
+  try {
+    const r = await fetch('/upload', {method: 'POST', body: fd, headers: {'X-Token': TOKEN}});
+    const d = await r.json();
+    out.innerText = d.ok
+      ? 'Recebido: ' + d.salvos.join(', ') + ' — agora digite: analisa o ultimo arquivo que eu mandei'
+      : 'Erro: ' + d.erro;
+    el.value = '';
+  } catch (e) { out.innerText = 'Falha no envio'; }
+}
 setInterval(atualizarStatus, 3000);
 atualizarStatus();
 </script>
 </body>
 </html>"""
 
-TOKEN_REDE = os.environ.get("INDIANOS_TOKEN") or secrets.token_urlsafe(16)
-
 if FLASK_DISPONIVEL:
     app_rede = Flask(__name__)
     app_rede.logger.disabled = True
 
     @app_rede.before_request
-    def _exigir_token():
-        enviado = request.headers.get("X-Token") or request.args.get("token") or ""
+    def _checar_token():
+        if request.path == "/":
+            return None
+        enviado = request.headers.get("X-Token") or request.args.get("t") or ""
         if not hmac.compare_digest(enviado.encode("utf-8"), TOKEN_REDE.encode("utf-8")):
-            return jsonify({"ok": False, "erro": "nao autorizado"}), 401
+            return jsonify({"ok": False, "erro": "token inválido"}), 401
 
     @app_rede.route("/")
     def _pagina_inicial():
@@ -2007,6 +2024,24 @@ if FLASK_DISPONIVEL:
         print(f"[Rede] Comando recebido do celular: {texto}")
         threading.Thread(target=processar_resposta_texto, args=(texto,), daemon=True).start()
         return jsonify({"ok": True})
+
+    app_rede.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+
+    @app_rede.route("/upload", methods=["POST"])
+    def _receber_upload():
+        if not sistema_ativo:
+            return jsonify({"ok": False, "erro": "sistema bloqueado — desperte a Indianos primeiro (senha/palmas)"}), 409
+        if not arquivos_ia:
+            return jsonify({"ok": False, "erro": "módulo indianos_arquivos.py não carregado"}), 500
+        salvos, recusados = arquivos_ia.salvar_upload(request.files.getlist("arquivo"))
+        if not salvos:
+            extra = f" (bloqueado: {', '.join(recusados)})" if recusados else ""
+            return jsonify({"ok": False, "erro": "nenhum arquivo aceito" + extra}), 400
+        print(f"[Rede] Arquivo(s) recebido(s) do celular: {salvos}")
+        threading.Thread(
+            target=falar, args=(f"Recebi {len(salvos)} arquivo{'s' if len(salvos) > 1 else ''} do celular.",),
+            daemon=True).start()
+        return jsonify({"ok": True, "salvos": [os.path.basename(p) for p in salvos], "recusados": recusados})
 
 def _obter_ip_local():
     try:
@@ -2049,12 +2084,11 @@ def iniciar_servidor_rede():
     print("[Rede] Servidor pro celular no ar. Endereços possíveis (teste o que combina com a rede do seu celular):")
     for ip in ips:
         marca = "  <- provável, se usar Hotspot Móvel do Windows" if ip.startswith("192.168.137.") else ""
-        print(f"          http://{ip}:{PORTA_SERVIDOR_REDE}/?token={TOKEN_REDE}{marca}")
+        print(f"          http://{ip}:{PORTA_SERVIDOR_REDE}/?t={TOKEN_REDE}{marca}")
     try:
         app_rede.run(host="0.0.0.0", port=PORTA_SERVIDOR_REDE, debug=False, use_reloader=False)
     except Exception as e:
         print(f"[Rede] Erro ao subir servidor: {e}")
-
 
 ADB_CELULAR_IP = ""
 
@@ -2129,7 +2163,6 @@ def celular_volume(subir=True, quantas_vezes=3):
     for _ in range(quantas_vezes):
         adb_shell(f"input keyevent {tecla}")
 
-
 APPS_CELULAR = {
     "whatsapp": "com.whatsapp",
     "youtube": "com.google.android.youtube",
@@ -2151,7 +2184,6 @@ def celular_abrir_app(nome_app):
             break
     pacote = APPS_CELULAR.get(nome)
     if not pacote:
-
         for chave, pac in APPS_CELULAR.items():
             if chave in nome or nome in chave:
                 pacote = pac
@@ -2211,7 +2243,7 @@ def celular_interpretar_texto_a_digitar(pedido):
         "resultado certo.\n\n"
         "Exemplos:\n"
         "Pedido: 'digite o alfabeto no celular' -> Resposta: abcdefghijklmnopqrstuvwxyz\n"
-        "Pedido: 'escreve bom dia no celular' -> Resposta: bom dia\n"
+        "Pedido: 'escreve bom dia meu amor no celular' -> Resposta: bom dia meu amor\n"
         "Pedido: 'digita os números de 1 a 5' -> Resposta: 12345"
     )
     resposta = chamar_gemini(
@@ -2226,7 +2258,7 @@ def celular_interpretar_texto_a_digitar(pedido):
     return resultado
 
 def celular_digitar(texto):
-    texto_adb = re.sub(r'[`$\\;&|<>()]', "", texto).replace(" ", "%s").replace('"', "").replace("'", "")
+    texto_adb = texto.replace(" ", "%s").replace('"', "").replace("'", "")
     comando = f'input text "{texto_adb}"'
     print(f"[Celular] Rodando: adb shell {comando}")
     saida, erro = adb_shell(comando)
@@ -2286,7 +2318,7 @@ def celular_ligar_tela():
     _, erro = adb_shell("input keyevent KEYCODE_WAKEUP")
     return erro
 
-SENHA_CELULAR = os.environ.get("CELULAR_PIN", "")
+SENHA_CELULAR = os.environ.get("INDIANOS_SENHA_CELULAR", "")
 
 def celular_desbloquear():
     celular_ligar_tela()
@@ -2296,7 +2328,7 @@ def celular_desbloquear():
         largura, altura = resolucao
         celular_deslizar(largura // 2, int(altura * 0.8), largura // 2, int(altura * 0.3), 300)
         time.sleep(0.6)
-    if SENHA_CELULAR and SENHA_CELULAR.isalnum():
+    if SENHA_CELULAR:
         adb_shell(f"input text {SENHA_CELULAR}")
         adb_shell("input keyevent KEYCODE_ENTER")
         return None
@@ -2314,7 +2346,6 @@ def celular_clicar_com_visao(comando_usuario):
     caminho, erro = celular_tirar_print()
     if erro:
         return f"não consegui tirar print do celular ({erro})"
-
 
     largura = altura = None
     try:
@@ -2406,11 +2437,11 @@ def arduino_control_loop():
                 if led_estado == 'off':
                     led_estado = 'on'
                     arduino.write(b"APAGAR\n")
-                    print("Comando APAGAR enviado ao Arduino")
+                    print("🟢 Comando APAGAR enviado ao Arduino")
                 elif led_estado == 'on':
                     led_estado = 'off'
                     arduino.write(b"ACENDER\n")
-                    print("Comando ACENDER enviado ao Arduino")
+                    print("🔴 Comando ACENDER enviado ao Arduino")
 
             if arduino and arduino.in_waiting > 0:
                 resposta = arduino.readline().decode('utf-8').strip()
